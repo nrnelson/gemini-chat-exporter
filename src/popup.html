@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Chat Exporter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Gemini Chat Exporter</h1>
+
+    <div id="status" class="status"></div>
+
+    <div id="not-gemini" class="warning hidden">
+      <p>Please navigate to <strong>gemini.google.com</strong> to export a chat.</p>
+    </div>
+
+    <div id="controls">
+      <button id="export-btn" class="btn primary">
+        Export to Markdown
+      </button>
+
+      <button id="copy-btn" class="btn secondary">
+        Copy to Clipboard
+      </button>
+    </div>
+
+    <div id="result" class="result hidden">
+      <p class="success-msg"></p>
+    </div>
+
+    <div id="error" class="error hidden">
+      <p class="error-msg"></p>
+    </div>
+
+    <footer>
+      <p>v1.0.0</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
