@@ -171,10 +171,9 @@
     // Remove remaining HTML tags
     html = html.replace(/<[^>]+>/g, '');
 
-    // Decode HTML entities
-    const textArea = document.createElement('textarea');
-    textArea.innerHTML = html;
-    html = textArea.value;
+    // Decode HTML entities using DOMParser (safer than innerHTML)
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    html = doc.body.textContent || '';
 
     // Clean up extra whitespace
     html = html.replace(/\n{3,}/g, '\n\n');

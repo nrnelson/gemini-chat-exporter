@@ -31,8 +31,11 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "gemini-chat-exporter@example.com",
-      "strict_min_version": "109.0"
+      "id": "gemini-conversation-exporter@nrnelson.github.io",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   }
 }
