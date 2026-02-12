@@ -1,7 +1,7 @@
 // Background script for handling downloads
 // This prevents the popup closing issue that causes download failures
 
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === 'download') {
     const { content, filename } = message;
 
@@ -12,10 +12,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       url: url,
       filename: filename,
       saveAs: true
-    }).then((downloadId) => {
+    }).then(() => {
       // Clean up the blob URL after download starts
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      sendResponse({ success: true, downloadId });
+      sendResponse({ success: true });
     }).catch((error) => {
       URL.revokeObjectURL(url);
       sendResponse({ success: false, error: error.message });

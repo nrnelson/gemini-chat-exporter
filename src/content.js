@@ -208,8 +208,8 @@
       const el = document.querySelector(selector);
       if (el && el.textContent.trim() && el.textContent.trim().length < 200) {
         const text = el.textContent.trim();
-        // Skip generic titles
-        if (!text.toLowerCase().includes('gemini') || text.length > 10) {
+        // Skip generic titles that are just "Gemini" or similar
+        if (!text.toLowerCase().includes('gemini')) {
           return text;
         }
       }
