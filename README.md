@@ -73,7 +73,7 @@ The AI response with preserved formatting, including:
 ### Project Structure
 
 ```
-ai-exporter-plugin/
+gemini-chat-exporter/
 ├── manifest.json      # Extension manifest
 ├── icons/
 │   ├── icon-48.png    # Toolbar icon
