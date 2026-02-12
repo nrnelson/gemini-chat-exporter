@@ -4,182 +4,6 @@
   'use strict';
 
   /**
-   * Try to extract timestamp from a turn or message element
-   * @param {Element} el - Element to search for timestamp
-   * @returns {string|null} Timestamp string if found
-   */
-  function extractTimestamp(el) {
-    // Check for common timestamp data attributes
-    const timestampAttrs = [
-      'data-timestamp',
-      'data-time',
-      'data-date',
-      'data-created',
-      'data-sent-at',
-      'data-message-time'
-    ];
-
-    for (const attr of timestampAttrs) {
-      // Check on the element itself
-      let value = el.getAttribute(attr);
-      if (value) return formatTimestamp(value);
-
-      // Check on parent elements
-      let parent = el.parentElement;
-      for (let i = 0; i < 5 && parent; i++) {
-        value = parent.getAttribute(attr);
-        if (value) return formatTimestamp(value);
-        parent = parent.parentElement;
-      }
-    }
-
-    // Look for time elements
-    const timeEl = el.querySelector('time, [class*="time"], [class*="date"], [class*="timestamp"]');
-    if (timeEl) {
-      const datetime = timeEl.getAttribute('datetime') || timeEl.textContent.trim();
-      if (datetime) return formatTimestamp(datetime);
-    }
-
-    // Check for aria-label with time info
-    const ariaTime = el.querySelector('[aria-label*=":"], [aria-label*="AM"], [aria-label*="PM"]');
-    if (ariaTime) {
-      const label = ariaTime.getAttribute('aria-label');
-      if (label && /\d{1,2}:\d{2}/.test(label)) {
-        return label;
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Format a timestamp value into a readable string
-   * @param {string} value - Raw timestamp value
-   * @returns {string} Formatted timestamp
-   */
-  function formatTimestamp(value) {
-    // If it's a Unix timestamp (milliseconds or seconds)
-    const num = parseInt(value, 10);
-    if (!isNaN(num)) {
-      const date = new Date(num > 9999999999 ? num : num * 1000);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleString();
-      }
-    }
-
-    // If it's an ISO date string
-    const date = new Date(value);
-    if (!isNaN(date.getTime())) {
-      return date.toLocaleString();
-    }
-
-    // Return as-is if we can't parse it
-    return value;
-  }
-
-  /**
-   * Extract messages from a conversation turn container
-   * @param {Element} turn - Turn container element
-   * @param {Array} messages - Messages array to append to
-   * @param {Set} seenContent - Set of seen content hashes
-   */
-  function extractFromTurn(turn, messages, seenContent) {
-    // Within each turn, find the user query and model response
-    // User queries typically come first, then model responses
-
-    // Try to extract timestamp for this turn
-    const turnTimestamp = extractTimestamp(turn);
-
-    // Try to find user message within this turn
-    const userEl = turn.querySelector(
-      '[data-message-author-role="user"], ' +
-      'user-query, ' +
-      '.user-query, ' +
-      '[class*="query-content"], ' +
-      '[class*="user-message"]'
-    );
-
-    // Try to find model response within this turn
-    const modelEl = turn.querySelector(
-      '[data-message-author-role="model"], ' +
-      'model-response, ' +
-      '.model-response, ' +
-      '[class*="response-content"], ' +
-      '[class*="model-message"], ' +
-      '.markdown-content, ' +
-      '[class*="markdown"]'
-    );
-
-    if (userEl) {
-      const content = extractMessageContent(userEl);
-      const hash = hashContent(content);
-      if (content && !seenContent.has(hash)) {
-        seenContent.add(hash);
-        const timestamp = extractTimestamp(userEl) || turnTimestamp;
-        messages.push({ role: 'user', content: content.trim(), timestamp });
-      }
-    }
-
-    if (modelEl) {
-      const content = extractMessageContent(modelEl);
-      const hash = hashContent(content);
-      if (content && !seenContent.has(hash)) {
-        seenContent.add(hash);
-        const timestamp = extractTimestamp(modelEl) || turnTimestamp;
-        messages.push({ role: 'assistant', content: content.trim(), timestamp });
-      }
-    }
-  }
-
-  /**
-   * Extract messages from main content area (fallback method)
-   * @param {Element} container - Main content container
-   * @param {Array} messages - Messages array to append to
-   * @param {Set} seenContent - Set of seen content hashes
-   */
-  function extractFromMainContent(container, messages, seenContent) {
-    // Find all potential message containers, but only top-level ones
-    const potentialMessages = [];
-
-    // Look for elements that look like message containers
-    const candidates = container.querySelectorAll(
-      '[data-message-author-role], ' +
-      '[class*="query"]:not([class*="query"] [class*="query"]), ' +
-      '[class*="response"]:not([class*="response"] [class*="response"])'
-    );
-
-    // Filter to only include non-nested elements
-    candidates.forEach(el => {
-      // Skip if this element is a child of another candidate
-      let isNested = false;
-      let parent = el.parentElement;
-      while (parent && parent !== container) {
-        if (parent.matches('[data-message-author-role], [class*="query"], [class*="response"]')) {
-          isNested = true;
-          break;
-        }
-        parent = parent.parentElement;
-      }
-
-      if (!isNested) {
-        potentialMessages.push(el);
-      }
-    });
-
-    // Process non-nested messages
-    potentialMessages.forEach(el => {
-      const role = determineMessageRole(el);
-      const content = extractMessageContent(el);
-      const hash = hashContent(content);
-
-      if (content && content.trim() && !seenContent.has(hash)) {
-        seenContent.add(hash);
-        messages.push({ role, content: content.trim() });
-      }
-    });
-  }
-
-  /**
    * Create a simple hash of content for deduplication
    * @param {string} content - Content to hash
    * @returns {string} Hash string
@@ -208,26 +32,6 @@
     }
 
     return result;
-  }
-
-  /**
-   * Determine if an element is a user or assistant message
-   * @param {Element} el - DOM element
-   * @returns {string} 'user' or 'assistant'
-   */
-  function determineMessageRole(el) {
-    const classNames = (el.className || '').toLowerCase();
-    const dataRole = el.getAttribute('data-message-author-role');
-
-    if (dataRole === 'user' ||
-        classNames.includes('user') ||
-        classNames.includes('query') ||
-        classNames.includes('human') ||
-        classNames.includes('prompt')) {
-      return 'user';
-    }
-
-    return 'assistant';
   }
 
   /**
@@ -451,16 +255,10 @@
 
     messages.forEach((msg, index) => {
       if (msg.role === 'user') {
-        markdown += `## 👤 User`;
+        markdown += `## 👤 User\n\n`;
       } else {
-        markdown += `## 🤖 Gemini`;
+        markdown += `## 🤖 Gemini\n\n`;
       }
-
-      // Add timestamp if available
-      if (msg.timestamp) {
-        markdown += ` — *${msg.timestamp}*`;
-      }
-      markdown += `\n\n`;
 
       markdown += `${msg.content}\n\n`;
 
@@ -478,10 +276,10 @@
    */
   function findScrollContainer() {
 
-    // Try to find elements that contain the conversation turns
-    // This is more reliable than guessing at container classes
+    // Try to find elements that contain the conversation messages
+    // Gemini uses user-query and model-response custom elements
     const turnElements = document.querySelectorAll(
-      'conversation-turn, [class*="conversation-turn"], [data-turn-id]'
+      'user-query, model-response, conversation-turn, [class*="conversation-turn"], [data-turn-id]'
     );
 
     if (turnElements.length > 0) {
@@ -565,24 +363,52 @@
    * Extract messages from currently visible content
    * @param {Array} messages - Messages array to append to
    * @param {Set} seenContent - Set of seen content hashes for deduplication
+   * @param {boolean} prepend - Whether to prepend messages (for older content when scrolling up)
    */
-  function extractVisibleMessages(messages, seenContent) {
-    const turnContainers = document.querySelectorAll(
-      'conversation-turn, ' +
-      '[class*="conversation-turn"], ' +
-      '[data-turn-id], ' +
-      '.turn-container'
-    );
+  function extractVisibleMessages(messages, seenContent, prepend = false) {
+    // Gemini uses custom Angular elements: <user-query> and <model-response>
+    // These are siblings in the DOM, not nested in a container together
+    const messageElements = document.querySelectorAll('user-query, model-response');
 
-    if (turnContainers.length > 0) {
-      turnContainers.forEach(turn => {
-        extractFromTurn(turn, messages, seenContent);
-      });
-    } else {
-      const mainContent = document.querySelector('main, [role="main"]');
-      if (mainContent) {
-        extractFromMainContent(mainContent, messages, seenContent);
+    const newMessages = [];
+
+    messageElements.forEach((el) => {
+      const isUserQuery = el.tagName === 'USER-QUERY';
+      const isModelResponse = el.tagName === 'MODEL-RESPONSE';
+
+      if (isUserQuery) {
+        // Extract user message content
+        const content = extractMessageContent(el);
+        const hash = hashContent(content);
+        if (content && content.trim() && !seenContent.has(hash)) {
+          seenContent.add(hash);
+          newMessages.push({ role: 'user', content: content.trim() });
+        }
+      } else if (isModelResponse) {
+        // Extract model response content
+        const modelTextEl = el.querySelector(
+          '.model-response-text message-content, ' +
+          '.model-response-text .markdown, ' +
+          '.model-response-text'
+        );
+
+        const contentEl = modelTextEl || el;
+        const content = extractMessageContent(contentEl);
+        const hash = hashContent(content);
+
+        if (content && content.trim() && !seenContent.has(hash)) {
+          seenContent.add(hash);
+          newMessages.push({ role: 'assistant', content: content.trim() });
+        }
       }
+    });
+
+    // If prepending, add new messages to the beginning (they're older)
+    // If appending, add to the end (default behavior)
+    if (prepend && newMessages.length > 0) {
+      messages.unshift(...newMessages);
+    } else {
+      messages.push(...newMessages);
     }
   }
 
@@ -625,14 +451,30 @@
       }
     };
 
+    const setScrollTop = (value) => {
+      if (container) {
+        container.scrollTop = value;
+      } else {
+        window.scrollTo(0, value);
+      }
+    };
+
     // Gemini uses virtual scrolling - extract messages during scroll
-    // Scroll UP from current position to top, extracting as we go
+    // Start at the bottom to ensure we capture newest messages first
 
-    // Extract at current position first
-    extractVisibleMessages(messages, seenContent);
+    // Jump to bottom first and wait for content to stabilize
+    setScrollTop(getScrollHeight());
+    await sleep(200);
 
-    // Use 90% of viewport height to ensure overlap
-    const scrollStep = Math.max(500, Math.floor(getClientHeight() * 0.9));
+    // Extract at current position (bottom) - these are the newest messages
+    extractVisibleMessages(messages, seenContent, false);
+
+    // Wait and extract again in case more content loaded
+    await sleep(100);
+    extractVisibleMessages(messages, seenContent, false);
+
+    // Use 70% of viewport height to ensure good overlap between scroll positions
+    const scrollStep = Math.max(400, Math.floor(getClientHeight() * 0.7));
     let stuckCount = 0;
     let scrollCount = 0;
     const maxScrolls = 500;
@@ -649,8 +491,8 @@
       // Wait for content to load - short base delay, adaptive logic will extend if needed
       await sleep(50);
 
-      // Extract visible messages
-      extractVisibleMessages(messages, seenContent);
+      // Extract visible messages - prepend since we're scrolling up (older messages)
+      extractVisibleMessages(messages, seenContent, true);
 
       let currentScrollTop = getScrollTop();
       let currentScrollHeight = getScrollHeight();
@@ -658,9 +500,9 @@
       // Adaptive waiting: if content changed, Gemini may still be loading more
       // Wait and check again in a loop until content stabilizes
       let adaptiveLoops = 0;
-      while (adaptiveLoops < 3) {
-        await sleep(50);
-        extractVisibleMessages(messages, seenContent);
+      while (adaptiveLoops < 5) {
+        await sleep(75);
+        extractVisibleMessages(messages, seenContent, true);
         const newScrollHeight = getScrollHeight();
         const newMessageCount = messages.length;
 
@@ -698,7 +540,21 @@
     }
 
     // One final extraction at the top
-    extractVisibleMessages(messages, seenContent);
+    extractVisibleMessages(messages, seenContent, true);
+
+    // Scroll to absolute top and wait for content to load
+    setScrollTop(0);
+    await sleep(300);
+    extractVisibleMessages(messages, seenContent, true);
+
+    // Wait a bit more and extract again - Gemini can be slow loading oldest messages
+    await sleep(200);
+    extractVisibleMessages(messages, seenContent, true);
+
+    // One more scroll to 0 in case content shifted
+    setScrollTop(0);
+    await sleep(200);
+    extractVisibleMessages(messages, seenContent, true);
   }
 
   /**
@@ -721,8 +577,8 @@
           const seenContent = new Set();
           await autoScrollConversation(messages, seenContent);
 
-          // Deduplicate messages (collected newest-first, need to reverse for chronological order)
-          const dedupedMessages = deduplicateMessages(messages).reverse();
+          // Deduplicate messages (already in chronological order due to prepend logic)
+          const dedupedMessages = deduplicateMessages(messages);
           const title = getChatTitle();
 
           if (dedupedMessages.length === 0) {
